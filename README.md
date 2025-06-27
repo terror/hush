@@ -16,5 +16,5 @@ root.
 
 ## Prior Art
 
-[**whisper-web**](https://github.com/xenova/whisper-web) - ML-powered speech recognition directly in your browser
-
+[**whisper-web**](https://github.com/xenova/whisper-web) - ML-powered speech
+recognition directly in your browser.

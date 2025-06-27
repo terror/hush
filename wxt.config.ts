@@ -6,7 +6,7 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
     cross_origin_isolated: true,
-    permissions: ['microphone'],
+    permissions: ['microphone', 'activeTab'],
     host_permissions: [
       'https://huggingface.co/*',
       'https://cdn.jsdelivr.net/*',
