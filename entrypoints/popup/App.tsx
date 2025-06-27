@@ -10,10 +10,11 @@ import { transcribe } from './whisper';
 
 export default function App() {
   const [error, setError] = useState('');
-  const [recording, setRecording] = useState(false);
-  const [text, setText] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [text, setText] = useState('');
+
   const media = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
 
