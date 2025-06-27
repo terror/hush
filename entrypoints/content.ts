@@ -1,6 +1,14 @@
 import { blobToPCM } from './popup/audio';
 import { transcribe } from './popup/whisper';
 
+interface HotkeyConfig {
+  ctrlKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+  metaKey: boolean;
+  key: string;
+}
+
 interface RecordingState {
   isRecording: boolean;
   mediaRecorder: MediaRecorder | null;
@@ -8,6 +16,14 @@ interface RecordingState {
   targetElement: HTMLElement | null;
   overlay: HTMLElement | null;
 }
+
+const DEFAULT_HOTKEY: HotkeyConfig = {
+  ctrlKey: true,
+  altKey: false,
+  shiftKey: true,
+  metaKey: false,
+  key: 'L',
+};
 
 const state: RecordingState = {
   isRecording: false,
@@ -17,16 +33,78 @@ const state: RecordingState = {
   overlay: null,
 };
 
+let currentHotkey: HotkeyConfig = DEFAULT_HOTKEY;
+
 export default defineContentScript({
   matches: ['<all_urls>'],
   main() {
     console.log('[Hush] Content script loaded');
+
+    loadHotkeyConfig();
+
     document.addEventListener('keydown', handleKeyDown);
+
+    browser.storage.onChanged.addListener((changes, namespace) => {
+      if (namespace === 'sync' && changes.hotkey) {
+        currentHotkey = changes.hotkey.newValue || DEFAULT_HOTKEY;
+        console.log('[Hush] Hotkey updated:', formatHotkey(currentHotkey));
+      }
+    });
   },
 });
 
+async function loadHotkeyConfig() {
+  try {
+    const result = await browser.storage.sync.get('hotkey');
+
+    if (result.hotkey) {
+      currentHotkey = result.hotkey;
+      console.log('[Hush] Loaded hotkey:', formatHotkey(currentHotkey));
+    } else {
+      await browser.storage.sync.set({ hotkey: DEFAULT_HOTKEY });
+      console.log('[Hush] Using default hotkey:', formatHotkey(DEFAULT_HOTKEY));
+    }
+  } catch (error) {
+    console.error('[Hush] Failed to load hotkey config:', error);
+  }
+}
+
+function formatHotkey(config: HotkeyConfig): string {
+  const parts = [];
+
+  if (config.ctrlKey) {
+    parts.push('Ctrl');
+  }
+
+  if (config.altKey) {
+    parts.push('Alt');
+  }
+
+  if (config.shiftKey) {
+    parts.push('Shift');
+  }
+
+  if (config.metaKey) {
+    parts.push('Cmd');
+  }
+
+  parts.push(config.key);
+
+  return parts.join(' + ');
+}
+
+function matchesHotkey(event: KeyboardEvent, hotkey: HotkeyConfig): boolean {
+  return (
+    event.ctrlKey === hotkey.ctrlKey &&
+    event.altKey === hotkey.altKey &&
+    event.shiftKey === hotkey.shiftKey &&
+    event.metaKey === hotkey.metaKey &&
+    event.key.toUpperCase() === hotkey.key.toUpperCase()
+  );
+}
+
 function handleKeyDown(event: KeyboardEvent) {
-  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'L') {
+  if (matchesHotkey(event, currentHotkey)) {
     event.preventDefault();
 
     const activeElement = document.activeElement as HTMLElement;
@@ -167,7 +245,7 @@ function showRecordingOverlay() {
         border-radius: 50%;
         animation: hush-blink 1s infinite;
       "></div>
-      Recording... Press Ctrl+Shift+L to stop
+      Recording... Press ${formatHotkey(currentHotkey)} to stop
     </div>
   `;
 
