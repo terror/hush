@@ -1,3 +1,3 @@
-# WXT + React
+## hush
 
-This template should help get you started developing with React in WXT.
+**hush** is a browser extension that lets you easily convert speech to text.
