@@ -1,6 +1,6 @@
 import { type HotkeyConfig, formatHotkey } from '../lib/hotkey';
 
-export function isInputElement(element: HTMLElement): boolean {
+export function isTextField(element: HTMLElement): boolean {
   return (
     element.tagName === 'INPUT' ||
     element.tagName === 'TEXTAREA' ||

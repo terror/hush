@@ -2,7 +2,7 @@ import { createRecordingManager } from '@/lib/audio';
 import {
   OverlayManager,
   insertTextIntoElement,
-  isInputElement,
+  isTextField,
 } from '@/lib/content';
 import {
   DEFAULT_HOTKEY,
@@ -57,7 +57,7 @@ function handleKeyDown(event: KeyboardEvent) {
 
     const activeElement = document.activeElement as HTMLElement;
 
-    if (isInputElement(activeElement)) {
+    if (isTextField(activeElement)) {
       if (state.isRecording) {
         stopRecording();
       } else {
