@@ -2,6 +2,16 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { createRecordingManager } from '@/lib/audio';
+import {
+  DEFAULT_HOTKEY,
+  type HotkeyConfig,
+  formatHotkey,
+  loadHotkeyFromStorage,
+  saveHotkeyToStorage,
+} from '@/lib/hotkey';
+import { transcribeBlob } from '@/lib/transcription';
+import type { View } from '@/lib/types';
 import {
   AlertCircle,
   ArrowLeft,
@@ -13,27 +23,6 @@ import {
   Square,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-
-import { blobToPCM } from './audio';
-import { transcribe } from './whisper';
-
-interface HotkeyConfig {
-  ctrlKey: boolean;
-  altKey: boolean;
-  shiftKey: boolean;
-  metaKey: boolean;
-  key: string;
-}
-
-const DEFAULT_HOTKEY: HotkeyConfig = {
-  ctrlKey: true,
-  altKey: false,
-  shiftKey: true,
-  metaKey: false,
-  key: 'L',
-};
-
-type View = 'main' | 'settings';
 
 interface HotkeySettingProps {
   hotkey: HotkeyConfig;
@@ -82,16 +71,6 @@ function HotkeySetting({
 
     onHotkeyChange(newHotkey);
     setIsListening(false);
-  }
-
-  function formatHotkey(config: HotkeyConfig): string {
-    const parts = [];
-    if (config.ctrlKey) parts.push('Ctrl');
-    if (config.altKey) parts.push('Alt');
-    if (config.shiftKey) parts.push('Shift');
-    if (config.metaKey) parts.push('Cmd');
-    parts.push(config.key);
-    return parts.join(' + ');
   }
 
   function resetToDefault() {
@@ -163,11 +142,8 @@ function SettingsView({ onBack, error, onError }: SettingsViewProps) {
 
   async function loadSettings() {
     try {
-      const result = await browser.storage.sync.get('hotkey');
-
-      if (result.hotkey) {
-        setHotkey(result.hotkey);
-      }
+      const loadedHotkey = await loadHotkeyFromStorage();
+      setHotkey(loadedHotkey);
     } catch (err) {
       console.error('Failed to load settings:', err);
     }
@@ -175,7 +151,7 @@ function SettingsView({ onBack, error, onError }: SettingsViewProps) {
 
   async function saveSettings() {
     try {
-      await browser.storage.sync.set({ hotkey });
+      await saveHotkeyToStorage(hotkey);
       setSettingsSaved(true);
       setTimeout(() => setSettingsSaved(false), 2000);
     } catch (err) {
@@ -251,16 +227,13 @@ export default function App() {
   const [text, setText] = useState('');
   const [view, setView] = useState<View>('main');
 
-  const media = useRef<MediaRecorder | null>(null);
-  const chunks = useRef<Blob[]>([]);
+  const recordingManager = useRef(createRecordingManager());
 
   async function start() {
     setError('');
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      media.current = new MediaRecorder(stream);
-      media.current.ondataavailable = (e) => chunks.current.push(e.data);
-      media.current.start();
+      await recordingManager.current.start();
       setRecording(true);
     } catch (e: any) {
       if (e.name === 'NotAllowedError') {
@@ -274,26 +247,18 @@ export default function App() {
   }
 
   async function stop() {
-    media.current?.stop();
-    media.current?.stream.getTracks().forEach((t) => t.stop());
-    media.current!.onstop = async () => {
-      const webm = new Blob(chunks.current, { type: 'audio/webm' });
-      chunks.current = [];
-
+    try {
+      const blob = await recordingManager.current.stop();
+      setRecording(false);
       setIsTranscribing(true);
       setText('');
-
-      try {
-        const pcm = await blobToPCM(webm);
-        const out = await transcribe(pcm);
-        setText(out);
-      } catch (e: any) {
-        setError(`Transcription failed: ${e.message}`);
-      } finally {
-        setRecording(false);
-        setIsTranscribing(false);
-      }
-    };
+      const transcribedText = await transcribeBlob(blob);
+      setText(transcribedText);
+    } catch (e: any) {
+      setError(`Transcription failed: ${e.message}`);
+    } finally {
+      setIsTranscribing(false);
+    }
   }
 
   async function copy() {
