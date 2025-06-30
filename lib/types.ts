@@ -6,16 +6,26 @@ export interface HotkeyConfig {
   key: string;
 }
 
+export interface ModelConfig {
+  id: string;
+  name: string;
+  description: string;
+  size: string;
+  languages: 'english' | 'multilingual';
+}
+
+export interface Settings {
+  hotkey: HotkeyConfig;
+  model: string; // Model ID
+}
+
 export interface StorageData {
-  hotkey?: HotkeyConfig;
+  settings?: Settings;
 }
 
 export interface RecordingState {
   isRecording: boolean;
-  mediaRecorder: MediaRecorder | null;
-  chunks: Blob[];
   targetElement: HTMLElement | null;
-  overlay: HTMLElement | null;
 }
 
 export type View = 'main' | 'settings';

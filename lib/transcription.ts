@@ -5,55 +5,141 @@ import {
 } from '@xenova/transformers';
 
 import { blobToPCM } from './audio';
+import { DEFAULT_MODEL } from './model';
+import { SettingsManager } from './settings';
 
 env.allowLocalModels = false;
 
-const MODEL_NAME = 'Xenova/whisper-base';
-
 type Transcript = string;
 
-let asr: AutomaticSpeechRecognitionPipeline | null = null;
+const modelCache = new Map<string, AutomaticSpeechRecognitionPipeline>();
 
-/**
- * Transcribes PCM audio using the Xenova Whisper automatic‑speech‑recognition pipeline.
- *
- * The first call lazily initialises the heavy Whisper model and caches the
- * resulting {@link AutomaticSpeechRecognitionPipeline} in the `asr` variable so
- * that subsequent calls incur *no* model‑loading overhead.
- *
- * Whisper expects **mono 16 kHz** linear PCM wrapped in a {@link Float32Array}.
- * If your input is a different format or sample‑rate, convert it beforehand —
- * or use {@link transcribeBlob}, which handles typical browser audio blobs for
- * you.
- *
- * @param audioData Raw 16 kHz mono PCM samples to transcribe.
- * @returns A {@link Transcript} containing the recognised text as a string.
- *          Language detection is handled by the multilingual Whisper model
- *          but not exposed in this simplified interface.
- *
- * @example
- * ```ts
- * const pcm = recordMicrophone();
- * const text = await transcribe(pcm);
- * console.log(text);
- * ```
- *
- * @throws If the model cannot be loaded or inference fails.
- */
-export async function transcribe(audioData: Float32Array): Promise<Transcript> {
-  if (!asr) {
-    asr = await pipeline<'automatic-speech-recognition'>(
-      'automatic-speech-recognition',
-      MODEL_NAME,
-      { device: 'webgpu' }
-    );
+export class TranscriptionService {
+  private settingsManager: SettingsManager;
+
+  private static instance: TranscriptionService;
+
+  private constructor() {
+    this.settingsManager = SettingsManager.getInstance();
   }
 
-  const result = (await asr(audioData)) as { text: string };
+  /**
+   * Gets the singleton instance of the TranscriptionService.
+   *
+   * @returns The singleton TranscriptionService instance
+   */
+  static getInstance(): TranscriptionService {
+    if (!TranscriptionService.instance) {
+      TranscriptionService.instance = new TranscriptionService();
+    }
 
-  return result.text.trim();
-}
+    return TranscriptionService.instance;
+  }
 
-export async function transcribeBlob(blob: Blob): Promise<Transcript> {
-  return transcribe(await blobToPCM(blob));
+  /**
+   * Retrieves or loads an automatic speech recognition model.
+   *
+   * Models are cached to avoid repeated loading. Falls back to default model on failure.
+   *
+   * @param modelId - Optional model identifier. Uses settings default if not provided
+   * @returns Promise resolving to the loaded ASR pipeline
+   * @throws Error if model loading fails completely
+   * @private
+   */
+  private async getModel(
+    modelId?: string
+  ): Promise<AutomaticSpeechRecognitionPipeline> {
+    const targetModelId =
+      modelId || (await this.settingsManager.getSetting('model'));
+
+    if (modelCache.has(targetModelId)) {
+      return modelCache.get(targetModelId)!;
+    }
+
+    console.info(`[Transcription] Loading model: ${targetModelId}`);
+
+    try {
+      const asr = await pipeline<'automatic-speech-recognition'>(
+        'automatic-speech-recognition',
+        targetModelId,
+        { device: 'webgpu' }
+      );
+
+      modelCache.set(targetModelId, asr);
+
+      console.info(
+        `[Transcription] Model loaded successfully: ${targetModelId}`
+      );
+
+      return asr;
+    } catch (error) {
+      console.error(
+        `[Transcription] Failed to load model ${targetModelId}:`,
+        error
+      );
+
+      if (targetModelId !== DEFAULT_MODEL) {
+        console.info(
+          `[Transcription] Falling back to default model: ${DEFAULT_MODEL}`
+        );
+        return this.getModel(DEFAULT_MODEL);
+      }
+
+      throw new Error(`Failed to load transcription model: ${error}`);
+    }
+  }
+
+  /**
+   * Preloads a specific model into the cache for faster subsequent use.
+   *
+   * Useful for warming up models before they're needed for transcription.
+   * @param modelId - The model identifier to preload
+   * @returns Promise that resolves when preloading is complete
+   */
+  async preloadModel(modelId: string): Promise<void> {
+    try {
+      await this.getModel(modelId);
+      console.info(`[Transcription] Model preloaded: ${modelId}`);
+    } catch (error) {
+      console.error(
+        `[Transcription] Failed to preload model ${modelId}:`,
+        error
+      );
+    }
+  }
+
+  /**
+   * Transcribes audio data to text using automatic speech recognition.
+   *
+   * @param audioData - Float32Array containing PCM audio data
+   * @param modelId - Optional model identifier to use for transcription
+   * @returns Promise resolving to the transcribed text
+   * @throws Error if transcription fails
+   */
+  async transcribe(
+    audioData: Float32Array,
+    modelId?: string
+  ): Promise<Transcript> {
+    const asr = await this.getModel(modelId);
+
+    try {
+      const result = (await asr(audioData)) as { text: string };
+      return result.text.trim();
+    } catch (error) {
+      console.error('[Transcription] Inference failed:', error);
+      throw new Error(`Transcription failed: ${error}`);
+    }
+  }
+
+  /**
+   * Transcribes audio from a Blob by converting it to PCM format first.
+   *
+   * @param blob - Audio blob to transcribe
+   * @param modelId - Optional model identifier to use for transcription
+   * @returns Promise resolving to the transcribed text
+   * @throws Error if audio conversion or transcription fails
+   */
+  async transcribeBlob(blob: Blob, modelId?: string): Promise<Transcript> {
+    return this.transcribe(await blobToPCM(blob), modelId);
+  }
 }

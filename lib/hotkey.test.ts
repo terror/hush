@@ -1,23 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
-import {
-  DEFAULT_HOTKEY,
-  type HotkeyConfig,
-  formatHotkey,
-  matchesHotkey,
-} from '../lib/hotkey';
-
-describe('DEFAULT_HOTKEY', () => {
-  it('should have correct default values', () => {
-    expect(DEFAULT_HOTKEY).toEqual({
-      ctrlKey: true,
-      altKey: false,
-      shiftKey: true,
-      metaKey: false,
-      key: 'L',
-    });
-  });
-});
+import { formatHotkey, matchesHotkey } from '../lib/hotkey';
+import { DEFAULT_SETTINGS } from './settings';
+import { HotkeyConfig } from './types';
 
 describe('formatHotkey', () => {
   it('should format hotkey with all modifiers', () => {
@@ -89,7 +74,7 @@ describe('formatHotkey', () => {
   });
 
   it('should format default hotkey correctly', () => {
-    const result = formatHotkey(DEFAULT_HOTKEY);
+    const result = formatHotkey(DEFAULT_SETTINGS.hotkey);
     expect(result).toBe('Ctrl + Shift + L');
   });
 });

@@ -4,55 +4,59 @@ import {
   insertTextIntoElement,
   isTextField,
 } from '@/lib/content';
-import {
-  DEFAULT_HOTKEY,
-  type HotkeyConfig,
-  loadHotkeyFromStorage,
-  matchesHotkey,
-} from '@/lib/hotkey';
-import { transcribeBlob } from '@/lib/transcription';
-
-interface RecordingState {
-  isRecording: boolean;
-  targetElement: HTMLElement | null;
-}
+import { matchesHotkey } from '@/lib/hotkey';
+import { DEFAULT_SETTINGS, SettingsManager } from '@/lib/settings';
+import { TranscriptionService } from '@/lib/transcription';
+import { RecordingState } from '@/lib/types';
 
 const state: RecordingState = {
   isRecording: false,
   targetElement: null,
 };
 
-let currentHotkey: HotkeyConfig = DEFAULT_HOTKEY;
+let currentSettings = DEFAULT_SETTINGS;
 
-const recordingManager = createRecordingManager();
 const overlayManager = new OverlayManager();
+const recordingManager = createRecordingManager();
+const settingsManager = SettingsManager.getInstance();
+const transcriptionService = TranscriptionService.getInstance();
 
 export default defineContentScript({
   matches: ['<all_urls>'],
   main() {
     console.info('[Hush] Content script loaded');
-    initializeHotkey();
+    initializeSettings();
     document.addEventListener('keydown', handleKeyDown);
-    setupStorageListener();
+    setupSettingsListener();
   },
 });
 
-async function initializeHotkey() {
-  currentHotkey = await loadHotkeyFromStorage();
-  console.info('[Hush] Loaded hotkey:', currentHotkey);
+async function initializeSettings() {
+  try {
+    currentSettings = await settingsManager.loadSettings();
+
+    console.info('[Hush] Loaded settings:', currentSettings);
+
+    try {
+      await transcriptionService.preloadModel(currentSettings.model);
+      console.info('[Hush] Model preloaded successfully');
+    } catch (error) {
+      console.warn('[Hush] Failed to preload model:', error);
+    }
+  } catch (error) {
+    console.error('[Hush] Failed to initialize settings:', error);
+  }
 }
 
-function setupStorageListener() {
-  browser.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'sync' && changes.hotkey) {
-      currentHotkey = changes.hotkey.newValue || DEFAULT_HOTKEY;
-      console.info('[Hush] Hotkey updated:', currentHotkey);
-    }
+function setupSettingsListener() {
+  settingsManager.onSettingsChanged((newSettings) => {
+    currentSettings = newSettings;
+    console.info('[Hush] Settings updated:', newSettings);
   });
 }
 
 function handleKeyDown(event: KeyboardEvent) {
-  if (matchesHotkey(event, currentHotkey)) {
+  if (matchesHotkey(event, currentSettings.hotkey)) {
     event.preventDefault();
 
     const activeElement = document.activeElement as HTMLElement;
@@ -76,10 +80,26 @@ async function startRecording(targetElement: HTMLElement) {
     state.isRecording = true;
     state.targetElement = targetElement;
 
-    overlayManager.showRecording(currentHotkey);
+    overlayManager.showRecording(currentSettings.hotkey);
+
+    console.info('[Hush] Recording started');
   } catch (error) {
-    console.error('[Hush] Failed to start recording:', error);
-    overlayManager.showError('Microphone permission denied or not available');
+    let errorMessage = 'Failed to start recording';
+
+    console.error(`[Hush] ${errorMessage}: ${error}`);
+
+    if (error instanceof Error) {
+      if (error.name === 'NotAllowedError') {
+        errorMessage = `${errorMessage}: Microphone permission denied`;
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = `${errorMessage}: No microphone found`;
+      } else {
+        errorMessage = `${errorMessage}: ${error.message}`;
+      }
+    }
+
+    overlayManager.showError(errorMessage);
+
     cleanup();
   }
 }
@@ -87,12 +107,20 @@ async function startRecording(targetElement: HTMLElement) {
 async function stopRecording() {
   if (!recordingManager.isRecording()) return;
 
+  console.info('[Hush] Stopping recording...');
+
   try {
-    const blob = await recordingManager.stop();
-    await processRecording(blob);
+    await processRecording(await recordingManager.stop());
   } catch (error) {
-    console.error('[Hush] Recording failed:', error);
-    overlayManager.showError('Recording failed');
+    let errorMessage = 'Failed to record audio';
+
+    console.error(`[Hush] ${errorMessage}: ${error}`);
+
+    if (error instanceof Error) {
+      errorMessage = `${errorMessage}: ${error.message}`;
+    }
+
+    overlayManager.showError(errorMessage);
   } finally {
     cleanup();
   }
@@ -103,13 +131,34 @@ async function processRecording(blob: Blob) {
 
   overlayManager.showTranscribing();
 
+  console.info(
+    `[Hush] Processing recording with model: ${currentSettings.model}`
+  );
+
   try {
-    const text = await transcribeBlob(blob);
-    insertTextIntoElement(state.targetElement, text);
-    overlayManager.showSuccess();
+    const text = await transcriptionService.transcribeBlob(
+      blob,
+      currentSettings.model
+    );
+
+    if (text.trim()) {
+      insertTextIntoElement(state.targetElement, text);
+      overlayManager.showSuccess();
+      console.info('[Hush] Transcription successful:', text);
+    } else {
+      overlayManager.showError('No speech detected');
+      console.info('[Hush] No speech detected in recording');
+    }
   } catch (error) {
-    console.error('[Hush] Transcription failed:', error);
-    overlayManager.showError('Transcription failed');
+    let errorMessage = 'Failed to transcribe audio';
+
+    console.error(`[Hush] ${errorMessage}: ${error}`);
+
+    if (error instanceof Error) {
+      errorMessage = `${errorMessage}: ${error.message}`;
+    }
+
+    overlayManager.showError(errorMessage);
   }
 }
 
@@ -117,4 +166,5 @@ function cleanup() {
   state.isRecording = false;
   state.targetElement = null;
   recordingManager.cleanup();
+  console.info('[Hush] Cleanup completed');
 }
