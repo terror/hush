@@ -38,10 +38,10 @@ async function initializeSettings() {
     console.info('[Hush] Loaded settings:', currentSettings);
 
     try {
-      await transcriptionService.preloadModel(currentSettings.model);
-      console.info('[Hush] Model preloaded successfully');
+      await transcriptionService.loadModel(currentSettings.model);
+      console.info('[Hush] Model loaded successfully');
     } catch (error) {
-      console.warn('[Hush] Failed to preload model:', error);
+      console.warn('[Hush] Failed to load model:', error);
     }
   } catch (error) {
     console.error('[Hush] Failed to initialize settings:', error);

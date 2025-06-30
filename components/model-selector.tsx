@@ -1,6 +1,7 @@
 import { AVAILABLE_MODELS } from '@/lib/model';
 import { TranscriptionService } from '@/lib/transcription';
 import type { ModelConfig } from '@/lib/types';
+import { formatError } from '@/lib/utils';
 import { Brain, Check, Download, Globe, Languages } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -14,26 +15,26 @@ export function ModelSelector({
   selectedModel,
   onModelChange,
 }: ModelSelectorProps) {
-  const [preloadingModel, setPreloadingModel] = useState<string | null>(null);
+  const [loadingModel, setLoadingModel] = useState<string | null>(null);
 
   async function handleModelSelect(modelId: string) {
     if (modelId === selectedModel) return;
 
-    setPreloadingModel(modelId);
+    setLoadingModel(modelId);
 
     try {
-      await TranscriptionService.getInstance().preloadModel(modelId);
+      await TranscriptionService.getInstance().loadModel(modelId);
       onModelChange(modelId);
-    } catch (error) {
-      toast.error(`Failed to load model: ${error}`);
+    } catch (error: unknown) {
+      toast.error(formatError(error));
     } finally {
-      setPreloadingModel(null);
+      setLoadingModel(null);
     }
   }
 
   function ModelCard({ model }: { model: ModelConfig }) {
     const isSelected = selectedModel === model.id;
-    const isPreloading = preloadingModel === model.id;
+    const isPreloading = loadingModel === model.id;
 
     return (
       <div

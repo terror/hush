@@ -57,29 +57,24 @@ export class SettingsManager {
    * Loads all settings from browser storage with caching and validation.
    *
    * @returns Promise resolving to the complete settings object
-   * @throws Returns DEFAULT_SETTINGS if storage access fails
+   * @throws Error if storage access fails
    */
   async loadSettings(): Promise<Settings> {
     if (this.cache) {
       return this.cache;
     }
 
-    try {
-      const result = (await browser.storage.sync.get(
-        'settings'
-      )) as StorageData;
-      const settings = result.settings || DEFAULT_SETTINGS;
+    const result = (await browser.storage.sync.get('settings')) as StorageData;
 
-      if (!AVAILABLE_MODELS.find((m) => m.id === settings.model)) {
-        settings.model = DEFAULT_SETTINGS.model;
-      }
+    const settings = result.settings || DEFAULT_SETTINGS;
 
-      this.cache = settings;
-      return settings;
-    } catch (error) {
-      console.error('Failed to load settings:', error);
-      return DEFAULT_SETTINGS;
+    if (!AVAILABLE_MODELS.find((m) => m.id === settings.model)) {
+      settings.model = DEFAULT_SETTINGS.model;
     }
+
+    this.cache = settings;
+
+    return settings;
   }
 
   /**
@@ -96,15 +91,10 @@ export class SettingsManager {
    * ```
    */
   async saveSettings(settings: Partial<Settings>): Promise<void> {
-    try {
-      const currentSettings = await this.loadSettings();
-      const newSettings = { ...currentSettings, ...settings };
-      await browser.storage.sync.set({ settings: newSettings });
-      this.cache = newSettings;
-    } catch (error) {
-      console.error('Failed to save settings:', error);
-      throw new Error('Failed to save settings');
-    }
+    const currentSettings = await this.loadSettings();
+    const newSettings = { ...currentSettings, ...settings };
+    await browser.storage.sync.set({ settings: newSettings });
+    this.cache = newSettings;
   }
 
   /**

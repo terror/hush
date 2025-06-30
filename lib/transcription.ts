@@ -5,7 +5,6 @@ import {
 } from '@xenova/transformers';
 
 import { blobToPCM } from './audio';
-import { DEFAULT_MODEL } from './model';
 import { SettingsManager } from './settings';
 
 env.allowLocalModels = false;
@@ -39,14 +38,13 @@ export class TranscriptionService {
   /**
    * Retrieves or loads an automatic speech recognition model.
    *
-   * Models are cached to avoid repeated loading. Falls back to default model on failure.
+   * Models are cached to avoid repeated loading.
    *
    * @param modelId - Optional model identifier. Uses settings default if not provided
    * @returns Promise resolving to the loaded ASR pipeline
    * @throws Error if model loading fails completely
-   * @private
    */
-  private async getModel(
+  async loadModel(
     modelId?: string
   ): Promise<AutomaticSpeechRecognitionPipeline> {
     const targetModelId =
@@ -56,56 +54,15 @@ export class TranscriptionService {
       return modelCache.get(targetModelId)!;
     }
 
-    console.info(`[Transcription] Loading model: ${targetModelId}`);
+    const asr = await pipeline<'automatic-speech-recognition'>(
+      'automatic-speech-recognition',
+      targetModelId,
+      { device: 'webgpu' }
+    );
 
-    try {
-      const asr = await pipeline<'automatic-speech-recognition'>(
-        'automatic-speech-recognition',
-        targetModelId,
-        { device: 'webgpu' }
-      );
+    modelCache.set(targetModelId, asr);
 
-      modelCache.set(targetModelId, asr);
-
-      console.info(
-        `[Transcription] Model loaded successfully: ${targetModelId}`
-      );
-
-      return asr;
-    } catch (error) {
-      console.error(
-        `[Transcription] Failed to load model ${targetModelId}:`,
-        error
-      );
-
-      if (targetModelId !== DEFAULT_MODEL) {
-        console.info(
-          `[Transcription] Falling back to default model: ${DEFAULT_MODEL}`
-        );
-        return this.getModel(DEFAULT_MODEL);
-      }
-
-      throw new Error(`Failed to load transcription model: ${error}`);
-    }
-  }
-
-  /**
-   * Preloads a specific model into the cache for faster subsequent use.
-   *
-   * Useful for warming up models before they're needed for transcription.
-   * @param modelId - The model identifier to preload
-   * @returns Promise that resolves when preloading is complete
-   */
-  async preloadModel(modelId: string): Promise<void> {
-    try {
-      await this.getModel(modelId);
-      console.info(`[Transcription] Model preloaded: ${modelId}`);
-    } catch (error) {
-      console.error(
-        `[Transcription] Failed to preload model ${modelId}:`,
-        error
-      );
-    }
+    return asr;
   }
 
   /**
@@ -120,15 +77,9 @@ export class TranscriptionService {
     audioData: Float32Array,
     modelId?: string
   ): Promise<Transcript> {
-    const asr = await this.getModel(modelId);
-
-    try {
-      const result = (await asr(audioData)) as { text: string };
-      return result.text.trim();
-    } catch (error) {
-      console.error('[Transcription] Inference failed:', error);
-      throw new Error(`Transcription failed: ${error}`);
-    }
+    const asr = await this.loadModel(modelId);
+    const result = (await asr(audioData)) as { text: string };
+    return result.text.trim();
   }
 
   /**
