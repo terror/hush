@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, jest } from 'bun:test';
 
 import { insertTextIntoElement, isTextField } from '../lib/content';

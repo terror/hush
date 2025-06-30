@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DEFAULT_SETTINGS, SettingsManager } from '@/lib/settings';
 import type { Settings } from '@/lib/types';
+import { formatError } from '@/lib/utils';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -29,8 +30,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       setLoading(true);
       const loadedSettings = await settingsManager.current.loadSettings();
       setSettings(loadedSettings);
-    } catch (err) {
-      toast.error('Failed to load settings');
+    } catch (error: unknown) {
+      toast.error(formatError(error));
     } finally {
       setLoading(false);
     }
@@ -41,8 +42,8 @@ export function SettingsView({ onBack }: SettingsViewProps) {
       await settingsManager.current.saveSettings(settings);
       setSettingsSaved(true);
       setTimeout(() => setSettingsSaved(false), 2000);
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error(formatError(error));
     }
   }
 

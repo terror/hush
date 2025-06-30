@@ -4,6 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { createRecordingManager } from '@/lib/audio';
 import { TranscriptionService } from '@/lib/transcription';
 import type { View } from '@/lib/types';
+import { formatError } from '@/lib/utils';
 import { SettingsView } from '@/views/settings';
 import { Copy, Mic, Settings as SettingsIcon, Square } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -23,14 +24,8 @@ export default function App() {
     try {
       await recordingManager.current.start();
       setRecording(true);
-    } catch (e: any) {
-      if (e.name === 'NotAllowedError') {
-        toast.error(
-          'Microphone permission denied. Please allow access to continue.'
-        );
-      } else {
-        toast.error(`${e.name}: ${e.message}`);
-      }
+    } catch (error: unknown) {
+      toast.error(formatError(error));
     }
   }
 
@@ -43,8 +38,8 @@ export default function App() {
       const transcribedText =
         await transcriptionService.current.transcribeBlob(blob);
       setText(transcribedText);
-    } catch (e: any) {
-      toast.error(`Transcription failed: ${e.message}`);
+    } catch (error: unknown) {
+      toast.error(formatError(error));
     } finally {
       setIsTranscribing(false);
     }
@@ -55,8 +50,8 @@ export default function App() {
       await navigator.clipboard.writeText(text);
       setJustCopied(true);
       setTimeout(() => setJustCopied(false), 1500);
-    } catch (e: any) {
-      toast.error('Failed to copy to clipboard');
+    } catch (error: unknown) {
+      toast.error(formatError(error));
     }
   }
 
