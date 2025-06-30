@@ -1,3 +1,29 @@
+/**
+ * Decode an audio {@link Blob} and convert it to **mono 32-bit floating-point**
+ * PCM samples, optionally resampling to a target sample-rate.
+ *
+ * The browser’s `AudioContext` is used for the initial decode, and an
+ * `OfflineAudioContext` is spun up when resampling is required.
+ *
+ * • If the blob’s native sample-rate already matches `targetRate`, the decoded
+ *   buffer is returned directly (fast path).
+ * • Otherwise, the audio is rendered through an offline graph to produce a
+ *   buffer at the desired rate before returning its first channel.
+ *
+ * @param blob       Audio file or stream (WAV, MP3, Ogg, etc.) to decode.
+ * @param targetRate Sample-rate in hertz to resample to (default **16 000 Hz**,
+ *                   which Whisper expects).
+ *
+ * @returns A `Float32Array` containing **mono** PCM samples at `targetRate`.
+ *
+ * @example
+ * ```ts
+ * const pcm = await blobToPCM(fileBlob, 16_000);
+ * console.log(`Got ${pcm.length} samples ready for ASR`);
+ * ```
+ *
+ * @throws DOMException If decoding fails (e.g., unsupported codec).
+ */
 export async function blobToPCM(
   blob: Blob,
   targetRate = 16_000
