@@ -44,5 +44,3 @@ export const AVAILABLE_MODELS: ModelConfig[] = [
     languages: 'multilingual',
   },
 ];
-
-export const DEFAULT_MODEL = 'Xenova/whisper-base';
