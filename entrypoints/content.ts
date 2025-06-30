@@ -1,3 +1,5 @@
+import browser from 'webextension-polyfill';
+
 import { blobToPCM } from './popup/audio';
 import { transcribe } from './popup/whisper';
 
