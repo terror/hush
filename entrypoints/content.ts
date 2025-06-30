@@ -30,7 +30,7 @@ const overlayManager = new OverlayManager();
 export default defineContentScript({
   matches: ['<all_urls>'],
   main() {
-    console.log('[Hush] Content script loaded');
+    console.info('[Hush] Content script loaded');
     initializeHotkey();
     document.addEventListener('keydown', handleKeyDown);
     setupStorageListener();
@@ -39,14 +39,14 @@ export default defineContentScript({
 
 async function initializeHotkey() {
   currentHotkey = await loadHotkeyFromStorage();
-  console.log('[Hush] Loaded hotkey:', currentHotkey);
+  console.info('[Hush] Loaded hotkey:', currentHotkey);
 }
 
 function setupStorageListener() {
   browser.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'sync' && changes.hotkey) {
       currentHotkey = changes.hotkey.newValue || DEFAULT_HOTKEY;
-      console.log('[Hush] Hotkey updated:', currentHotkey);
+      console.info('[Hush] Hotkey updated:', currentHotkey);
     }
   });
 }
