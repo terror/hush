@@ -16,8 +16,10 @@ export function insertTextIntoElement(
 ): void {
   if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
     const input = element as HTMLInputElement | HTMLTextAreaElement;
+
     const start = input.selectionStart || 0;
     const end = input.selectionEnd || 0;
+
     const currentValue = input.value;
 
     input.value = currentValue.slice(0, start) + text + currentValue.slice(end);
@@ -27,6 +29,7 @@ export function insertTextIntoElement(
     input.dispatchEvent(new Event('change', { bubbles: true }));
   } else if (element.contentEditable === 'true') {
     const selection = window.getSelection();
+
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       range.deleteContents();
