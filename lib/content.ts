@@ -66,13 +66,67 @@ export class OverlayManager {
         0%, 100% { transform: scale(1); }
         50% { transform: scale(1.05); }
       }
+
       @keyframes hush-blink {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.3; }
       }
+
       @keyframes hush-fadeIn {
         from { opacity: 0; transform: translateY(-10px); }
         to { opacity: 1; transform: translateY(0); }
+      }
+
+      .hush-overlay-base {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 10001;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      }
+
+      .hush-overlay-recording {
+        background: #ef4444;
+        animation: hush-pulse 2s infinite;
+      }
+
+      .hush-overlay-transcribing {
+        background: #1f2937;
+        animation: hush-fadeIn 0.3s ease-out;
+      }
+
+      .hush-overlay-success {
+        background: #10b981;
+        animation: hush-fadeIn 0.3s ease-out;
+      }
+
+      .hush-overlay-error {
+        background: #ef4444;
+        animation: hush-fadeIn 0.3s ease-out;
+      }
+
+      .hush-indicator-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        animation: hush-blink 1s infinite;
+      }
+
+      .hush-indicator-white {
+        background: white;
+      }
+
+      .hush-indicator-gray {
+        background: #6b7280;
       }
     `;
 
@@ -83,112 +137,54 @@ export class OverlayManager {
     this.remove();
 
     const overlay = document.createElement('div');
-    overlay.className = className;
+    overlay.className = `hush-overlay-base ${className}`;
     overlay.innerHTML = content;
 
     document.body.appendChild(overlay);
-
     this.overlay = overlay;
+  }
+
+  private createIcon(type: 'check' | 'close'): string {
+    const icons = {
+      check: '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>',
+      close:
+        '<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>',
+    };
+
+    return `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        ${icons[type]}
+      </svg>
+    `;
   }
 
   showRecording(hotkey: HotkeyConfig): void {
     this.createOverlay(
-      'hush-recording-overlay',
+      'hush-overlay-recording',
       `
-      <div style="
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #ef4444;
-        color: white;
-        padding: 12px 16px;
-        border-radius: 8px;
-        font-family: system-ui, sans-serif;
-        font-size: 14px;
-        font-weight: 500;
-        z-index: 10001;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        animation: hush-pulse 2s infinite;
-      ">
-        <div style="
-          width: 8px;
-          height: 8px;
-          background: white;
-          border-radius: 50%;
-          animation: hush-blink 1s infinite;
-        "></div>
+        <div class="hush-indicator-dot hush-indicator-white"></div>
         Recording... Press ${formatHotkey(hotkey)} to stop
-      </div>
-    `
+      `
     );
   }
 
   showTranscribing(): void {
     this.createOverlay(
-      'hush-transcribing-overlay',
+      'hush-overlay-transcribing',
       `
-      <div style="
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #1f2937;
-        color: white;
-        padding: 12px 16px;
-        border-radius: 8px;
-        font-family: system-ui, sans-serif;
-        font-size: 14px;
-        font-weight: 500;
-        z-index: 10001;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        animation: hush-fadeIn 0.3s ease-out;
-      ">
-        <div style="
-          width: 8px;
-          height: 8px;
-          background: #6b7280;
-          border-radius: 50%;
-          animation: hush-blink 1s infinite;
-        "></div>
+        <div class="hush-indicator-dot hush-indicator-gray"></div>
         Transcribing...
-      </div>
-    `
+      `
     );
   }
 
   showSuccess(message: string): void {
     this.createOverlay(
-      'hush-success-overlay',
+      'hush-overlay-success',
       `
-      <div style="
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #10b981;
-        color: white;
-        padding: 12px 16px;
-        border-radius: 8px;
-        font-family: system-ui, sans-serif;
-        font-size: 14px;
-        font-weight: 500;
-        z-index: 10001;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        animation: hush-fadeIn 0.3s ease-out;
-      ">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-        </svg>
+        ${this.createIcon('check')}
         ${message}
-      </div>
-    `
+      `
     );
 
     setTimeout(() => this.remove(), 2000);
@@ -196,32 +192,11 @@ export class OverlayManager {
 
   showError(message: string): void {
     this.createOverlay(
-      'hush-error-overlay',
+      'hush-overlay-error',
       `
-      <div style="
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #ef4444;
-        color: white;
-        padding: 12px 16px;
-        border-radius: 8px;
-        font-family: system-ui, sans-serif;
-        font-size: 14px;
-        font-weight: 500;
-        z-index: 10001;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        animation: hush-fadeIn 0.3s ease-out;
-      ">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-        </svg>
+        ${this.createIcon('close')}
         ${message}
-      </div>
-    `
+      `
     );
 
     setTimeout(() => this.remove(), 3000);
